@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bulk IP Location Checker</title>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+
+    main {
+      max-width: 1600px;
+      margin: auto;
+    }
+
+    h1 {
+      color: #38bdf8;
+    }
+
+    p {
+      line-height: 1.7;
+    }
+
+    .panel {
+      padding: 22px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      margin-bottom: 20px;
+    }
+
+    textarea,
+    input {
+      width: 100%;
+      padding: 14px;
+      color: #f8fafc;
+      background: #0f172a;
+      border: 1px solid #475569;
+      border-radius: 9px;
+      font: inherit;
+    }
+
+    textarea {
+      min-height: 200px;
+      resize: vertical;
+      margin: 12px 0;
+      font-family: monospace;
+    }
+
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 12px 0;
+    }
+
+    button {
+      padding: 12px 18px;
+      border: 0;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+      font: inherit;
+    }
+
+    button.secondary {
+      background: #475569;
+    }
+
+    button.danger {
+      background: #be123c;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .note {
+      color: #94a3b8;
+      font-size: 14px;
+    }
+
+    .cards {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px 22px;
+    }
+
+    progress {
+      width: 100%;
+      height: 18px;
+      accent-color: #38bdf8;
+    }
+
+    #message {
+      min-height: 24px;
+      overflow-wrap: anywhere;
+    }
+
+    #filter {
+      max-width: 520px;
+      margin-bottom: 16px;
+    }
+
+    .scroll {
+      overflow-x: auto;
+      border: 1px solid #334155;
+      border-radius: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #1e293b;
+    }
+
+    th,
+    td {
+      text-align: left;
+      vertical-align: top;
+      padding: 13px;
+      border-bottom: 1px solid #334155;
+    }
+
+    th {
+      background: #334155;
+      white-space: nowrap;
+    }
+
+    td {
+      overflow-wrap: anywhere;
+      max-width: 320px;
+    }
+
+    .good {
+      color: #4ade80;
+    }
+
+    .bad {
+      color: #fb7185;
+    }
+
+    a {
+      color: #38bdf8;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        padding: 12px;
+      }
+
+      .panel {
+        padding: 16px;
+      }
+
+      .card {
+        flex: 1 1 120px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+<main>
+  <h1>Bulk IP Location Checker</h1>
+
+  <p>
+    Paste IPv4 or IPv6 addresses below to look up their
+    approximate location and network information.
+  </p>
+
+  <section class="panel">
+    <label for="ips">
+      IP addresses — one per line, or separated by spaces or commas
+    </label>
+
+    <textarea
+      id="ips"
+      spellcheck="false"
+      placeholder="8.8.8.8&#10;1.1.1.1&#10;9.9.9.9"
+    ></textarea>
+
+    <div class="buttons">
+      <button id="check">Check locations</button>
+      <button id="stop" class="danger" disabled>Stop</button>
+      <button id="example" class="secondary">Load examples</button>
+      <button id="clear" class="secondary">Clear</button>
+      <button id="download" class="secondary" disabled>
+        Download CSV
+      </button>
+    </div>
+
+    <progress id="progress" max="1" value="0"></progress>
+    <p id="message" role="status" aria-live="polite">
+      Ready.
+    </p>
+
+    <p class="note">
+      Up to 100 unique inputs per run. Each IP uses one API request.
+      Submitted IPs are sent to ipwho.is.
+      Results remain in this browser tab and are not saved to GitHub.
+      Location is approximate. A successful lookup does not mean
+      the IP is online or safe.
+    </p>
+  </section>
+
+  <div class="cards">
+    <div class="card">Submitted: <span id="total">0</span></div>
+    <div class="card">Completed: <span id="completed">0</span></div>
+    <div class="card">Successful: <span id="success">0</span></div>
+    <div class="card">Errors: <span id="errors">0</span></div>
+  </div>
+
+  <input
+    id="filter"
+    type="search"
+    placeholder="Filter IP, country, ISP, organization..."
+    aria-label="Filter results"
+  >
+
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>IP address</th>
+          <th>Lookup status</th>
+          <th>Country</th>
+          <th>Region</th>
+          <th>City</th>
+          <th>ISP</th>
+          <th>Organization</th>
+          <th>ASN</th>
+          <th>Time zone</th>
+          <th>Coordinates</th>
+        </tr>
+      </thead>
+      <tbody id="results"></tbody>
+    </table>
+  </div>
+
+  <p class="note">
+    Geolocation data:
+    <a href="https://ipwhois.io/" target="_blank" rel="noopener">
+      IPWHOIS.io
+    </a>.
+    API quotas and availability apply.
+  </p>
+</main>
+
+<script>
+"use strict";
+
+const $ = id => document.getElementById(id);
+
+const fields = [
+  "ip",
+  "status",
+  "country",
+  "region",
+  "city",
+  "isp",
+  "organization",
+  "asn",
+  "timezone",
+  "coordinates"
+];
+
+let results = [];
+let running = false;
+let stopped = false;
+let activeController = null;
+
+function sleep(milliseconds) {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
+function updateCounters() {
+  $("completed").textContent = results.length;
+  $("success").textContent =
+    results.filter(item => item.status === "OK").length;
+  $("errors").textContent =
+    results.filter(item => item.status !== "OK").length;
+
+  $("progress").value = results.length;
+  $("download").disabled = running || results.length === 0;
+}
+
+function applyFilter() {
+  const query = $("filter").value.toLowerCase();
+
+  document.querySelectorAll("#results tr").forEach(row => {
+    row.hidden = !row.textContent.toLowerCase().includes(query);
+  });
+}
+
+function addResult(item) {
+  results.push(item);
+
+  const row = document.createElement("tr");
+
+  for (const field of fields) {
+    const cell = document.createElement("td");
+    const value = item[field];
+
+    cell.textContent =
+      value === undefined || value === null || value === ""
+        ? "—"
+        : String(value);
+
+    if (field === "status") {
+      cell.className = item.status === "OK" ? "good" : "bad";
+    }
+
+    row.appendChild(cell);
+  }
+
+  $("results").appendChild(row);
+  updateCounters();
+  applyFilter();
+}
+
+function setRunning(value) {
+  running = value;
+
+  $("check").disabled = value;
+  $("example").disabled = value;
+  $("clear").disabled = value;
+  $("ips").disabled = value;
+  $("stop").disabled = !value;
+
+  updateCounters();
+}
+
+function looksLikeIP(value) {
+  const ipv4 = value.split(".");
+
+  if (ipv4.length === 4 &&
+      ipv4.every(part => /^\d{1,3}$/.test(part))) {
+    return ipv4.every(part => Number(part) <= 255);
+  }
+
+  // The API performs final IPv6 validation.
+  return value.includes(":") &&
+    /^[0-9a-fA-F:.]+$/.test(value);
+}
+
+async function lookup(ip) {
+  activeController = new AbortController();
+  let timedOut = false;
+
+  const timer = setTimeout(() => {
+    timedOut = true;
+    activeController?.abort();
+  }, 15000);
+
+  try {
+    const response = await fetch(
+      "https://ipwho.is/" + encodeURIComponent(ip),
+      {
+        signal: activeController.signal,
+        credentials: "omit",
+        referrerPolicy: "no-referrer"
+      }
+    );
+
+    if (response.status === 429) {
+      return {
+        item: { ip, status: "API daily limit reached" },
+        quotaReached: true
+      };
+    }
+
+    if (!response.ok) {
+      throw new Error("API returned HTTP " + response.status);
+    }
+
+    const data = await response.json();
+
+    if (data.success !== true) {
+      return {
+        item: {
+          ip,
+          status: data.message || "Lookup failed"
+        }
+      };
+    }
+
+    const hasCoordinates =
+      Number.isFinite(data.latitude) &&
+      Number.isFinite(data.longitude);
+
+    return {
+      item: {
+        ip: data.ip || ip,
+        status: "OK",
+        country: data.country,
+        region: data.region,
+        city: data.city,
+        isp: data.connection?.isp,
+        organization: data.connection?.org,
+        asn: data.connection?.asn
+          ? "AS" + data.connection.asn
+          : "",
+        timezone: data.timezone?.id,
+        coordinates: hasCoordinates
+          ? data.latitude + ", " + data.longitude
+          : ""
+      }
+    };
+
+  } catch (error) {
+    if (stopped) {
+      return null;
+    }
+
+    return {
+      item: {
+        ip,
+        status: timedOut
+          ? "Request timed out"
+          : error instanceof TypeError
+            ? "Network / CORS error: API may be unavailable or blocked"
+            : error.message
+      }
+    };
+
+  } finally {
+    clearTimeout(timer);
+    activeController = null;
+  }
+}
+
+$("check").addEventListener("click", async () => {
+  if (running) return;
+
+  const input = $("ips").value.trim();
+
+  if (!input) {
+    $("message").textContent = "Please enter at least one IP address.";
+    return;
+  }
+
+  const ips = [...new Set(
+    input.split(/[\s,;]+/).filter(Boolean)
+      .map(value => value.toLowerCase())
+  )];
+
+  if (ips.length > 100) {
+    $("message").textContent =
+      "Please submit no more than 100 unique IP addresses per run.";
+    return;
+  }
+
+  results = [];
+  stopped = false;
+  $("results").replaceChildren();
+  $("filter").value = "";
+  $("total").textContent = ips.length;
+  $("progress").max = ips.length;
+  $("progress").value = 0;
+
+  setRunning(true);
+
+  let quotaReached = false;
+
+  try {
+    for (let index = 0; index < ips.length; index++) {
+      if (stopped) break;
+
+      const ip = ips[index];
+
+      $("message").textContent =
+        "Checking " + (index + 1) + " of " +
+        ips.length + ": " + ip;
+
+      if (!looksLikeIP(ip)) {
+        addResult({
+          ip,
+          status: "Invalid IP format — enter IPs, not domains or URLs"
+        });
+        continue;
+      }
+
+      const response = await lookup(ip);
+
+      if (response === null) break;
+
+      addResult(response.item);
+
+      if (response.quotaReached) {
+        quotaReached = true;
+        break;
+      }
+
+      if (index < ips.length - 1 && !stopped) {
+        await sleep(1000);
+      }
+    }
+
+    if (quotaReached) {
+      $("message").textContent =
+        "Stopped: API daily quota reached. Try again after it resets.";
+
+    } else if (stopped) {
+      $("message").textContent =
+        "Stopped. Completed " + results.length +
+        " of " + ips.length + " inputs.";
+
+    } else {
+      $("message").textContent =
+        "Finished. Processed " + results.length +
+        " unique inputs.";
+    }
+
+  } catch (error) {
+    $("message").textContent =
+      "Unexpected error: " + error.message;
+
+  } finally {
+    setRunning(false);
+  }
+});
+
+$("stop").addEventListener("click", () => {
+  stopped = true;
+  activeController?.abort();
+  $("message").textContent = "Stopping...";
+});
+
+$("example").addEventListener("click", () => {
+  $("ips").value = "8.8.8.8\n1.1.1.1\n9.9.9.9";
+});
+
+$("clear").addEventListener("click", () => {
+  results = [];
+  $("ips").value = "";
+  $("results").replaceChildren();
+  $("filter").value = "";
+  $("total").textContent = "0";
+  $("progress").value = 0;
+  $("message").textContent = "Ready.";
+  updateCounters();
+});
+
+$("filter").addEventListener("input", applyFilter);
+
+function csvCell(value) {
+  let text = String(value ?? "");
+
+  // Prevent spreadsheet formulas when opening exported CSV.
+  if (/^[=+\-@\t\r]/.test(text)) {
+    text = "'" + text;
+  }
+
+  return '"' + text.replace(/"/g, '""') + '"';
+}
+
+$("download").addEventListener("click", () => {
+  if (!results.length) return;
+
+  const lines = [
+    fields.map(csvCell).join(","),
+    ...results.map(item =>
+      fields.map(field => csvCell(item[field])).join(",")
+    )
+  ];
+
+  const blob = new Blob(
+    ["\uFEFF" + lines.join("\r\n")],
+    { type: "text/csv;charset=utf-8;" }
+  );
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = "bulk-ip-locations.csv";
+
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+</script>
+</body>
+</html>
